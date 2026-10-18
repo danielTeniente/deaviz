@@ -133,7 +133,7 @@ views/
   time_series.py          Time series module (~1.2k lines)
   about.py                In-app manual and examples
 utils/
-  data_processing.py      apply_operations(): replays the undo-able operation log
+  data_processing.py      Shared transformations, replay, and atomic undo/history updates
   plot_utils.py           (placeholder, unused)
 visualization.py          Legacy copy — NOT used by the app
 time_series.py            Legacy copy (identical to views/time_series.py) — NOT used
@@ -181,7 +181,6 @@ The main points (details and suggested fixes in
 
 - Time Series uses a separate data loader; data prepared on Home is not reused there.
 - Prophet models are refit on every interaction (no caching), so forecasting/changepoints are slow.
-- Imputation can silently drop columns that aren't float64/int64/object/category/bool (e.g. datetime, int32).
 - Forecasting with frequency “None” likely fails (`freq=None` passed to Prophet).
 - Unpinned dependencies and deprecated pandas APIs (`fillna(method=...)`, `"H"/"M"/"Q"/"Y"` aliases).
 - Two duplicate legacy files remain at the root; they are excluded from the installed package.

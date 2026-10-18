@@ -6,19 +6,25 @@ confirmed by reproducing them.
 
 Priority: 🔴 high · 🟠 medium · 🟢 low / nice-to-have
 
+**Resolved since the review:** 1.1, 1.3, 1.6, 1.7, 5.3, 5.5, and the chained
+`fillna(inplace=True)` part of 2.2 — transformations now live only in
+`utils/data_processing.py`, failures are explicit and atomic, and regression
+tests cover them (`tests/test_transformations.py`,
+`tests/test_views_operations.py`). Line references below predate that change.
+
 ---
 
 ## 1. Correctness bugs
 
 | # | Pri | Where | Issue | Suggested fix |
 |---|---|---|---|---|
-| 1.1 | 🔴 | `utils/data_processing.py:41-58`, `views/missing_data.py:122-140` | Imputation rebuilds the frame from only `float64/int64` and `object/category/bool` columns. Columns of any other dtype (datetime, `int32`, `float32`, nullable `Int64`, …) are **silently dropped**, and column order changes (numeric first). `df = df[df.columns]` is a no-op. | Impute in place: `df[num_cols] = imputer.fit_transform(df[num_cols])` using `select_dtypes("number")`, leave other columns alone. |
+| 1.1 ✅ | 🔴 | `utils/data_processing.py:41-58`, `views/missing_data.py:122-140` | Imputation rebuilds the frame from only `float64/int64` and `object/category/bool` columns. Columns of any other dtype (datetime, `int32`, `float32`, nullable `Int64`, …) are **silently dropped**, and column order changes (numeric first). `df = df[df.columns]` is a no-op. | Impute in place: `df[num_cols] = imputer.fit_transform(df[num_cols])` using `select_dtypes("number")`, leave other columns alone. |
 | 1.2 | 🔴 | `views/time_series.py:587, 635` | **Likely:** with frequency “None”, `resample_map.get("None", "D")` returns `None` (the key exists), so Prophet’s `make_future_dataframe(freq=None)` passes `freq=None` to `pd.date_range`, which raises. | `freq = resample_map.get(time_granularity) or "D"` (or infer with `pd.infer_freq`). |
-| 1.3 | 🟠 | `utils/data_processing.py:59-60` | Any exception in an operation is swallowed and the partially processed frame is returned. The user sees “applied successfully” even when it wasn’t. | Re-raise, or return an error the view shows with `st.error`. |
+| 1.3 ✅ | 🟠 | `utils/data_processing.py:59-60` | Any exception in an operation is swallowed and the partially processed frame is returned. The user sees “applied successfully” even when it wasn’t. | Re-raise, or return an error the view shows with `st.error`. |
 | 1.4 | 🟠 | `views/time_series.py:1187-1197` | Single-variable Trend Analysis doesn’t drop NaN before `LinearRegression.fit`. With a rolling window or resampling gaps it will raise. (The multi-variable branch does `dropna()`.) | `y = df_summary[selected_col].dropna()`. |
 | 1.5 | 🟠 | `views/time_series.py` Forecasting | Forecasting uses `df`, not `df_summary`, so the rolling-window setting is ignored there while other sections honour it. | Decide on one behaviour and document it. |
-| 1.6 | 🟢 | `views/home.py:268-280` | Operation History doesn’t list `remove_nan` and `impute` steps (they show as gaps in numbering). | Add the two cases, or give each op a `label`. |
-| 1.7 | 🟢 | `views/visualization.py:24, 38-39` | `data` is the session DataFrame itself (no `.copy()`), and category columns are cast to `str` in place, mutating `filtered_df` on every rerun. | `data = st.session_state["filtered_df"].copy()`. |
+| 1.6 ✅ | 🟢 | `views/home.py:268-280` | Operation History doesn’t list `remove_nan` and `impute` steps (they show as gaps in numbering). | Add the two cases, or give each op a `label`. |
+| 1.7 ✅ | 🟢 | `views/visualization.py:24, 38-39` | `data` is the session DataFrame itself (no `.copy()`), and category columns are cast to `str` in place, mutating `filtered_df` on every rerun. | `data = st.session_state["filtered_df"].copy()`. |
 | 1.8 | 🟢 | `views/time_series.py` preamble | If the loaded data has no numeric columns, `selectbox` returns `None` and later code fails with an unclear error. | Check `numerical_cols` and show a friendly message. |
 
 ## 2. Compatibility / dependency risks
@@ -53,9 +59,9 @@ Priority: 🔴 high · 🟠 medium · 🟢 low / nice-to-have
 |---|---|---|---|
 | 5.1 | 🔴 | Root-level `visualization.py` (2630 lines) and `time_series.py` (identical to `views/time_series.py`) are dead code. It’s easy to edit the wrong file. | Delete them (git history keeps them) or move to `legacy/`. |
 | 5.2 | 🟠 | `visualization()` is one ~1600-line function and `time_series_analysis()` one ~1200-line function with nested helpers and repeated local imports. | Split into one module per plot type / analysis section (e.g. `views/plots/boxes.py`) with a registry dict `{name: render_fn}`. |
-| 5.3 | 🟠 | Every preprocessing step is implemented twice (inline in views and in `apply_operations`). The two copies can drift. | Always go through `apply_operations` (single op on current df in direct mode, full replay in tracking mode). |
+| 5.3 ✅ | 🟠 | Every preprocessing step is implemented twice (inline in views and in `apply_operations`). The two copies can drift. | Always go through `apply_operations` (single op on current df in direct mode, full replay in tracking mode). |
 | 5.4 | 🟠 | Forecasting single- vs multi-variable branches are copy-pasted (~50 lines each); same for anomaly/trend. | Loop over `selected_vars` once; single variable is just a list of one. |
-| 5.5 | 🟢 | After every operation the same three lines recompute `filtered_df` / numeric / categorical columns. | Helper `set_working_df(df)`. |
+| 5.5 ✅ | 🟢 | After every operation the same three lines recompute `filtered_df` / numeric / categorical columns. | Helper `set_working_df(df)`. |
 | 5.6 | 🟢 | `utils/plot_utils.py` contains only `import numpy`; `views/` and `utils/` have no `__init__.py`. | Remove or populate; add `__init__.py` for clarity. |
 | 5.7 | 🟢 | Long `if/elif` chains for slider ranges and unit maps. | Small config dicts: `{"Daily": ("days", 7, 365, 30), …}`. |
 

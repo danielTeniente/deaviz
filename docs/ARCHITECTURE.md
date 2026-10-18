@@ -52,12 +52,12 @@ are not imported, and logs to a temporary file.
 |---|---:|---|
 | `my_viz_plotly.py` | 32 | Entry point and router |
 | `edaviz/launcher.py` | 325 | Local launcher (CLI and `edaviz.show()`); not imported by the app |
-| `views/home.py` | 295 | Load CSV (upload or GitHub URL), preprocessing operations, undo, preview, download |
-| `views/missing_data.py` | 91 | Missing-value table, drop rows, KNN/mode imputation |
-| `views/visualization.py` | 1596 | All general plots in one `visualization()` function with nested helpers |
+| `views/home.py` | 257 | Load CSV (upload or GitHub URL), preprocessing operations, undo, preview, download |
+| `views/missing_data.py` | 78 | Missing-value table, drop rows, KNN/mode imputation |
+| `views/visualization.py` | 1597 | All general plots in one `visualization()` function with nested helpers |
 | `views/time_series.py` | 1219 | Time series loader and ten analysis sections in one function |
 | `views/about.py` | 256 | Static manual / marketing text |
-| `utils/data_processing.py` | 60 | `apply_operations(raw_df, operations)` |
+| `utils/data_processing.py` | 316 | Single implementation of every operation (`apply_operation`), replay (`apply_operations`), and atomic session updates (`run_operation`, `undo_last_operation`, `set_working_df`) |
 | `utils/plot_utils.py` | 0 | Contains only `import numpy` — unused |
 | `visualization.py`, `time_series.py` (root) | 2630 / 1219 | Legacy copies, not imported anywhere |
 
@@ -71,11 +71,11 @@ are not imported, and logs to a temporary file.
 | `filtered_df` | DataFrame | Current working dataset used by all other pages |
 | `current_numeric_cols` | list[str] | Columns treated as numeric (recomputed from dtypes after each op) |
 | `current_categorical_cols` | list[str] | Columns treated as categorical (`object`/`category` dtypes) |
-| `operations` | list[dict] | Operation log for undo (only populated when tracking is on) |
-| `enable_operation_tracking` | bool | Undo mode toggle |
+| `operations` | list[dict] | Operation history; always recorded, so `filtered_df == apply_operations(raw_df, operations)` |
+| `enable_operation_tracking` | bool | Replay mode toggle; also shows Undo and the history |
 | `data_loaded` | bool | Whether a dataset is present |
 | `last_uploaded_file` | str | Filename / URL, used to detect a new upload |
-| `is_imputed` | bool | Set by the Missing Data page |
+| `is_imputed` | bool | Derived from `operations` (an `impute` step is present) |
 | `viz_state` | dict | Remembered plot type and X/Y/Color/Facet/Size mapping |
 
 ### Time Series only
@@ -88,28 +88,53 @@ The Time Series page **does not** read `filtered_df`; it has its own loader.
 
 ## Operation log and undo
 
-Home and Missing Data can work in two modes:
+Every Home and Missing Data action calls
+`utils.data_processing.run_operation(st.session_state, operation)`:
 
-- **Direct mode (default):** each button mutates `filtered_df` in place.
-- **Tracking mode:** each action appends a dict to `operations`, and
-  `filtered_df` is rebuilt as `apply_operations(raw_df, operations)`.
-  “Undo Last Operation” pops the last entry and replays.
+- **Direct mode (default):** the operation is applied to the current
+  `filtered_df` with `apply_operation`.
+- **Tracking mode:** the full history plus the new operation is replayed from
+  `raw_df` with `apply_operations`, which calls `apply_operation` per step.
+
+Both modes use the same per-operation code and always append to `operations`,
+so turning tracking on later replays the same result. “Undo Last Operation”
+calls `undo_last_operation`, which replays all but the last step; undoing the
+only step restores `raw_df`, and the data stays loaded.
+
+**Atomic failures.** Operations never mutate their input. Invalid requests and
+pandas/scikit-learn errors raise `OperationError`; replay names the failing
+step. The new frame, history, column-type lists, and `is_imputed` are written
+only after success, so a failure leaves the last valid state unchanged and the
+view shows `st.error` instead of a success message.
+
+**Read-only consumers.** Visualization and the Missing Data overview work on
+`filtered_df.copy()`; only `run_operation`, `undo_last_operation`, and the
+loaders write the working frame.
 
 Supported operation types:
 
 | `type` | Payload | Effect |
 |---|---|---|
-| `select_columns` | `columns` | Keep only these columns |
-| `cast_types` | `numeric_cols`, `categorical_cols` | `pd.to_numeric(errors="coerce")` / cast to `str` |
-| `subsample` | `sample_pct` | `df.sample(frac, random_state=42)` |
-| `melt` | `id_vars` | Wide → long with `variable` / `value` columns |
-| `date_features` | `date_column`, `dayfirst` | Adds Year, Month, Day, DayOfWeek, Hour |
-| `remove_nan` | — | `dropna()` |
-| `impute` | — | KNNImputer(k=5) on numeric, mode on categorical |
+| `select_columns` | `columns` | Keep these columns in the frame's existing order; unknown or empty selection fails |
+| `cast_types` | `numeric_cols`, `categorical_cols` | Numeric: existing numeric dtypes (incl. nullable `Int64`) are kept, others use `pd.to_numeric(errors="coerce")`; datetime-like columns and columns with no numeric values fail. Categorical: values become text with missing values kept missing; `category` columns are kept |
+| `subsample` | `sample_pct` | Same rows as `df.sample(frac, random_state=42)`, kept in original row order with index labels; 100 % is a no-op |
+| `melt` | `id_vars` | Wide → long with `variable` / `value` columns and a new RangeIndex; needs at least one non-ID column |
+| `date_features` | `date_column`, `dayfirst` | Adds Year, Month, Day, DayOfWeek, Hour (`int64`, or `float64` when any date is missing); the date column becomes ISO text with unparseable values missing. Fails if nothing parses or a feature column already exists |
+| `remove_nan` | — | `dropna()` keeping index, order, and dtypes; fails if it would remove every row |
+| `impute` | — | See below |
 
-Note: the same transformation logic is written twice — once in
-`apply_operations` and once inline in the views for direct mode. Any change must
-be made in both places.
+**Imputation rules.** Numeric columns other than booleans are KNN features
+(`KNNImputer(n_neighbors=5)`); only columns with missing values are replaced.
+Integer columns that receive imputed values become float (`Int*` → `Float64`,
+NumPy ints → `float64`) so fractional means are kept; float dtypes are kept.
+Text, `category`, and nullable boolean columns use their most frequent value
+(first after pandas' sort on ties). Datetime-like and all-missing columns are
+left unchanged, and the page warns that they still contain missing values.
+Column order, index, and the dtypes of unchanged columns are preserved. Empty
+frames pass through unchanged.
+
+Add new operation types only to `_HANDLERS` in `utils/data_processing.py`, with
+tests for direct execution, replay, and source preservation.
 
 ## Visualization page internals
 

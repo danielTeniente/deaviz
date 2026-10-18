@@ -20,8 +20,9 @@ def visualization():
         st.warning("Please upload and process a dataset in the Home section first.")
         return
 
-    # Use filtered_df as the dataset for visualization
-    data = st.session_state["filtered_df"]
+    # Work on a copy: presentation changes below must not alter the shared
+    # working frame used by Home, Missing Data, undo, and downloads.
+    data = st.session_state["filtered_df"].copy()
     
     # Check if imputation has been applied based on operation history
     if "operations" in st.session_state and any(op["type"] == "impute" for op in st.session_state["operations"]):

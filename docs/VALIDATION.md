@@ -30,8 +30,11 @@ Gates:
 3. Hash-locked dependency files match their input requirements, using pinned uv.
 4. Ruff correctness checks (`E9`, `F63`, `F7`, `F82`) with an exact existing-error baseline.
 5. Formatting of the launcher, validation scripts, and tests.
-6. Regression tests for transformation replay, source preservation, missing-row removal,
-   melt, deterministic sampling, and initial Home rendering; launcher tests for
+6. Regression tests for transformations: column, index, order, and dtype
+   preservation (including imputation of nullable integer, datetime, categorical,
+   all-missing, and empty data), explicit `OperationError` failures, agreement of
+   direct execution and replay, atomic session updates, undo and reset, a
+   read-only Visualization page, deterministic sampling, and initial Home rendering; launcher tests for
    localhost binding, occupied/invalid ports, startup failure and timeout, foreign
    servers on the port, stopping only its own process, optional browser opening,
    the CLI, and one real Streamlit start/stop.

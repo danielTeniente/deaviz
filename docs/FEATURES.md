@@ -10,28 +10,37 @@ same manual with screenshots.
 - *Load from GitHub*: paste a `.csv` link. `github.com/.../blob/...` links are
   converted to `raw.githubusercontent.com` automatically.
 
-**Operation tracking (undo).** The checkbox *Enable Operation Tracking for Undo*
-records each step so you can undo it. It replays every step from the raw data
-after each change, so it is slower on large files. *Reset All* clears the session.
+**Operation tracking (undo).** Every step is recorded. The checkbox *Enable
+Operation Tracking for Undo* shows the history and an *Undo Last Operation*
+button, and rebuilds the data by replaying every step from the raw data after
+each change, so it is slower on large files. Undoing the only step returns to
+the original data. *Reset All* clears the session.
+
+**Errors.** If a step cannot be applied (for example a melt with no value
+columns, a date column where nothing parses, or removing rows would leave no
+data), the page shows an error and keeps the previous data and history.
 
 **Preprocessing steps** (each has its own *Apply* button):
 
 | Step | What it does |
 |---|---|
-| Column Selection | Keep only the chosen columns |
-| Assign Variable Types | Mark columns numeric (non-numbers become NaN) or categorical (cast to text) |
-| Random Subsampling | Keep 1–100 % of rows (fixed seed 42, reproducible) |
+| Column Selection | Keep only the chosen columns, in their current order |
+| Assign Variable Types | Mark columns numeric (non-numbers become NaN) or categorical (cast to text; missing values stay missing) |
+| Random Subsampling | Keep 1–100 % of rows (fixed seed 42, reproducible, original row order kept) |
 | Melt Data | Reshape wide → long; chosen ID columns stay, the rest become `variable` / `value` |
-| Date Feature Engineering | Parse a date column (day-first optional) and add `Year`, `Month`, `Day`, `DayOfWeek`, `Hour` |
+| Date Feature Engineering | Parse a date column (day-first optional) and add `Year`, `Month`, `Day`, `DayOfWeek`, `Hour`; unparseable dates become missing |
 
 Then *Preview* the result and *Download Processed Data as CSV*.
 
 ## 2. Missing Data Imputation
 
 - Table of missing count and % per column.
-- **Remove Rows with Any Missing Values.**
-- **Impute:** numeric columns with `KNNImputer(n_neighbors=5)`, categorical
-  columns with the most frequent value.
+- **Remove Rows with Any Missing Values.** Refused if every row has a missing value.
+- **Impute:** numeric columns with `KNNImputer(n_neighbors=5)`, text, categorical
+  and boolean columns with the most frequent value. All columns are kept in
+  their order. Integer columns that receive imputed values become decimal
+  columns. Date and completely empty columns are not imputed; the page lists
+  any columns that still have missing values.
 
 ## 3. Visualization
 
