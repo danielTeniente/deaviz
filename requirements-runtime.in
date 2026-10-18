@@ -1,0 +1,3 @@
+# Existing application dependencies, plus the directly imported HTTP client.
+-r requirements.txt
+requests

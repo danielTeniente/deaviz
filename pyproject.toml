@@ -1,0 +1,60 @@
+[project]
+name = "edaviz"
+version = "0.1.0"
+description = "Interactive exploratory data analysis with Streamlit and Plotly"
+readme = "README.md"
+requires-python = "==3.10.*"
+license = "GPL-3.0-or-later"
+authors = [{ name = "Mario González Rodríguez" }]
+keywords = ["eda", "data-visualization", "streamlit", "plotly", "time-series"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.10",
+]
+dependencies = [
+    "matplotlib",
+    "missingno",
+    "numpy==1.26.4",
+    "pandas",
+    "plotly",
+    "plotly-calheatmap",
+    "plotly-calplot",
+    "prophet",
+    "requests",
+    "scikit-learn",
+    "scipy",
+    "statsmodels",
+    "streamlit",
+    "streamlit-option-menu",
+]
+
+[project.scripts]
+edaviz = "edaviz.launcher:main"
+
+[project.urls]
+Repository = "https://github.com/marsgr6/my_viz"
+
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+# Flat layout: ship the routed app modules unchanged; legacy root copies stay out.
+# `edaviz` holds only the local launcher; it runs the sibling my_viz_plotly.py.
+py-modules = ["my_viz_plotly"]
+packages = ["views", "utils", "edaviz"]
+
+[tool.ruff]
+target-version = "py310"
+include = ["my_viz_plotly.py", "views/*.py", "utils/*.py", "edaviz/*.py", "scripts/*.py", "tests/*.py"]
+
+[tool.ruff.lint]
+# Adopt correctness checks without reformatting or rewriting the existing app.
+select = ["E9", "F63", "F7", "F82"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+addopts = "-ra --strict-config --strict-markers"

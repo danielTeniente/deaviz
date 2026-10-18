@@ -1,0 +1,13 @@
+-r requirements-runtime.in
+pytest==8.4.2
+ruff==0.13.2
+pip==25.2
+uv==0.8.22
+PyYAML==6.0.2
+packaging
+build==1.6.1
+check-wheel-contents==0.6.3
+pyroma==5.0.1
+setuptools==84.0.0
+twine==7.0.0
+validate-pyproject[all]==0.26

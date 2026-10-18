@@ -1,0 +1,56 @@
+# Local Python environments
+.venv*/
+venv/
+env/
+ENV/
+
+# Python caches and validation output
+.cache/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.tox/
+.nox/
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+junit.xml
+.ipynb_checkpoints/
+
+# Generated distributions and deployment archives
+build/
+dist/
+*.egg-info/
+*.egg
+*.whl
+release.zip
+
+# Local credentials (keep the example environment file)
+.env
+.env.*
+!.env.example
+.streamlit/secrets.toml
+.pypirc
+
+# Local AI tooling and its supporting notes
+/.claude/
+/CLAUDE.md
+/docs/SKILL_SOURCES.md
+/docs/skill-licenses/
+
+# Editor, OS, and temporary files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+Desktop.ini
+*.swp
+*.swo
+*~
+*.log
+
+# Tests, scripts, lockfiles, and project docs belong in Git.
+# Installed package contents are controlled by pyproject.toml, not this file.
